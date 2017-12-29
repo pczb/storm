@@ -27,6 +27,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.esotericsoftware.kryo.util.Util;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -39,6 +40,7 @@ import org.apache.storm.kafka.spout.subscription.PatternTopicFilter;
 import org.apache.storm.kafka.spout.subscription.RoundRobinManualPartitioner;
 import org.apache.storm.kafka.spout.subscription.Subscription;
 import org.apache.storm.tuple.Fields;
+import org.apache.storm.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +88,7 @@ public class KafkaSpoutConfig<K, V> implements Serializable {
     private final boolean emitNullTuples;
     private final ProcessingGuarantee processingGuarantee;
     private final boolean tupleTrackingEnforced;
+    private String streamForNullTuple;
 
     /**
      * Creates a new KafkaSpoutConfig using a Builder.
@@ -107,6 +110,7 @@ public class KafkaSpoutConfig<K, V> implements Serializable {
         this.emitNullTuples = builder.emitNullTuples;
         this.processingGuarantee = builder.processingGuarantee;
         this.tupleTrackingEnforced = builder.tupleTrackingEnforced;
+        this.streamForNullTuple = builder.streamForNullTuple;
     }
 
     /**
@@ -177,6 +181,7 @@ public class KafkaSpoutConfig<K, V> implements Serializable {
         private boolean emitNullTuples = false;
         private ProcessingGuarantee processingGuarantee = DEFAULT_PROCESSING_GUARANTEE;
         private boolean tupleTrackingEnforced = false;
+        private String streamForNullTuple = Utils.DEFAULT_STREAM_ID;
 
         public Builder(String bootstrapServers, String... topics) {
             this(bootstrapServers, new ManualPartitionSubscription(new RoundRobinManualPartitioner(), new NamedTopicFilter(topics)));
@@ -395,6 +400,11 @@ public class KafkaSpoutConfig<K, V> implements Serializable {
             return this;
         }
 
+        public Builder<K, V> setStreamForNullTuple(String streamForNullTuple) {
+            this.streamForNullTuple = streamForNullTuple;
+            return this;
+        }
+
         public KafkaSpoutConfig<K, V> build() {
             return new KafkaSpoutConfig<>(this);
         }
@@ -531,6 +541,10 @@ public class KafkaSpoutConfig<K, V> implements Serializable {
 
     public boolean isEmitNullTuples() {
         return emitNullTuples;
+    }
+
+    public String getStreamForNullTuple() {
+        return streamForNullTuple;
     }
 
     @Override

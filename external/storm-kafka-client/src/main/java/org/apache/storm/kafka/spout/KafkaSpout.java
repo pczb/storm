@@ -459,7 +459,12 @@ public class KafkaSpout<K, V> extends BaseRichSpout {
                 final boolean isScheduled = retryService.isScheduled(msgId);
                 // not scheduled <=> never failed (i.e. never emitted), or scheduled and ready to be retried
                 if (!isScheduled || retryService.isReady(msgId)) {
-                    final String stream = tuple instanceof KafkaTuple ? ((KafkaTuple) tuple).getStream() : Utils.DEFAULT_STREAM_ID;
+                    String stream = Utils.DEFAULT_STREAM_ID;
+                    if (tuple == null) {
+                        stream = kafkaSpoutConfig.getStreamForNullTuple();
+                    } else if (tuple instanceof KafkaTuple) {
+                        stream = ((KafkaTuple) tuple).getStream();
+                    }
 
                     if (!isAtLeastOnceProcessing()) {
                         if (kafkaSpoutConfig.isTupleTrackingEnforced()) {
