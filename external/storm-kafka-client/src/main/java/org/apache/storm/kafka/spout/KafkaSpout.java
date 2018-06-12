@@ -49,6 +49,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.RetriableException;
 
+import org.apache.kafka.common.record.Records;
 import org.apache.storm.kafka.spout.KafkaSpoutConfig.FirstPollOffsetStrategy;
 import org.apache.storm.kafka.spout.KafkaSpoutConfig.ProcessingGuarantee;
 import org.apache.storm.kafka.spout.internal.CommitMetadataManager;
@@ -104,6 +105,9 @@ public class KafkaSpout<K, V> extends BaseRichSpout {
     private transient TopologyContext context;
     private transient CommitMetadataManager commitMetadataManager;
     private transient KafkaOffsetMetric kafkaOffsetMetric;
+    // 延迟队列相关
+    private long delayEmitMillSeconds = 0;
+    private long maxMessageTimestamp = 0;
 
     public KafkaSpout(KafkaSpoutConfig<K, V> kafkaSpoutConfig) {
         this(kafkaSpoutConfig, new KafkaConsumerFactoryDefault<K, V>());
@@ -280,6 +284,14 @@ public class KafkaSpout<K, V> extends BaseRichSpout {
     // ======== Next Tuple =======
     @Override
     public void nextTuple() {
+        if (delayEmitMillSeconds != 0) {
+            long now = System.currentTimeMillis();
+            if ((now -  maxMessageTimestamp) < delayEmitMillSeconds) {
+                LOG.debug("now:{} maxMessageTimestamp:{} is below threshold:{}", now, maxMessageTimestamp, delayEmitMillSeconds);
+                return;
+            }
+        }
+
         try {
             if (refreshSubscriptionTimer.isExpiredResetOnTrue()) {
                 kafkaSpoutConfig.getSubscription().refreshAssignment();
@@ -364,6 +376,11 @@ public class KafkaSpout<K, V> extends BaseRichSpout {
     private void setWaitingToEmit(ConsumerRecords<K, V> consumerRecords) {
         for (TopicPartition tp : consumerRecords.partitions()) {
             waitingToEmit.put(tp, new ArrayList<>(consumerRecords.records(tp)));
+            long tmpMax = 0;
+            for (ConsumerRecord record: waitingToEmit.get(tp)) {
+                tmpMax = Math.max(tmpMax, record.timestamp());
+            }
+            maxMessageTimestamp = Math.max(tmpMax, maxMessageTimestamp);
         }
     }
 
